@@ -11,4 +11,4 @@ endif()
 
 include_directories(include)
 
-add_executable(rk4 src/test_task)
+add_executable(rk4 src/main.cpp)

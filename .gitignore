@@ -45,3 +45,6 @@ build/
 
 # ignore .vscode directory
 .vscode/
+
+# Qt Creator settings
+CMakeLists.txt.user

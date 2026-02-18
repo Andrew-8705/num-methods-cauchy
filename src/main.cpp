@@ -6,7 +6,6 @@ int main() {
 
     // Параметры
     double x0 = 0.0, x1 = 2.0;
-    int n = 20;
     Vector<double> u0 = { 1.0 };
 
     // Уравнение du/dx = 5u
@@ -14,10 +13,17 @@ int main() {
         return Vector<double>{ 5.0 * v.data[0] }; 
     };
 
-    // Аналитика u(x) = e^(5x)
-    auto exact = [](double x) { return std::exp(5.0 * x); };
+    // Постоянный шаг
+    std::cout << "--- Constant Step ---\n";
+    RK4Solver<double>::solve(x0, x1, 20, u0, system);
 
-    RK4Solver<double>::solve(x0, x1, n, u0, system, exact);
+    // Адаптивный шаг
+    std::cout << "\n--- Adaptive Step ---\n";
+    RK4Solver<double>::Config config;
+    config.adaptive = true;
+    config.eps = 1e-4;
+
+    RK4Solver<double>::solve(x0, x1, 20, u0, system, config);
 
     return 0;
 }

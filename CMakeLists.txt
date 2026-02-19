@@ -9,18 +9,25 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets)
+find_package(Qt6 REQUIRED COMPONENTS Widgets PrintSupport)
 
-include_directories(include)
+include_directories(
+    include
+    3rdparty/qcustomplot
+)
 
 add_executable(rk4
     src/main.cpp
-    src/mainwindow.cpp
-    src/mainwindow.h
-    src/mainwindow.ui
+    
+    src/interface/mainwindow.cpp
+    include/interface/mainwindow.h
+    src/interface/mainwindow.ui
+    
+    3rdparty/qcustomplot/qcustomplot.cpp
+    3rdparty/qcustomplot/qcustomplot.h
 )
 
-target_link_libraries(rk4 PRIVATE Qt6::Widgets)
+target_link_libraries(rk4 PRIVATE Qt6::Widgets Qt6::PrintSupport)
 
 if(APPLE)
     set_target_properties(rk4 PROPERTIES MACOSX_BUNDLE ON)

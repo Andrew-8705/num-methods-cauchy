@@ -11,6 +11,8 @@ class Vector {
 public:
     std::vector<T> data;
 
+    Vector() = default;
+
     Vector(size_t size) : data(size, T(0)) {}
     Vector(std::initializer_list<T> list) : data(list) {}
 

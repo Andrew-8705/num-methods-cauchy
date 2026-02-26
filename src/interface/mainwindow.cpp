@@ -1,5 +1,6 @@
 #include "interface/mainwindow.h"
 #include "./ui_mainwindow.h"
+#include "TaskSolver.h"
 #include <QString>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -67,81 +68,44 @@ QTableWidgetItem* MainWindow::createCell(double val, int precision) {
     return new QTableWidgetItem(QString::number(val, 'g', precision));
 }
 
+TestParams MainWindow::getTestParams() {
+    TestParams p;
+    p.N = ui->spinTest_N->value();
+    p.u0 = ui->spinTest_U0->value();
+    p.x0 = ui->spinTest_X0->value();
+    p.b = ui->spinTest_B->value();
+    p.h = ui->spinTest_H->value();
+    p.eps = ui->spinTest_Eps->value();
+    p.adaptive = ui->checkTest_Control->isChecked();
+    p.max_steps = ui->spinMaxIter->value();
+    return p;
+}
+
+MainParams MainWindow::getMainParams() {
+    MainParams p;
+    p.m = ui->spinMain_M->value();
+    p.c = ui->spinMain_C->value();
+    p.k = ui->spinMain_K->value();
+    p.k_star = ui->spinMain_KStar->value();
+    p.u0 = ui->spinMain_U0->value();
+    p.v0 = ui->spinMain_V0->value();
+    p.x0 = ui->spinMain_X0->value();
+    p.b = ui->spinMain_B->value();
+    p.h = ui->spinMain_H->value();
+    p.eps = ui->spinMain_Eps->value();
+    p.adaptive = ui->checkMain_Control->isChecked();
+    p.max_steps = ui->spinMaxIter->value();
+    return p;
+}
+
 void MainWindow::on_btnCalcTest_clicked() {
-    SimulationResults results = runTestSimulation();
+    TestParams params = getTestParams();
+
+    SimulationResults results = TaskSolver::solveTest(params);
 
     updateTestTable(results);
     updateTestCharts(results);
-
-    double b = ui->spinTest_B->value();
-    showStats(results, b, true);
-}
-
-MainWindow::SimulationResults MainWindow::runTestSimulation() {
-    SimulationResults results;
-
-    // Чтение параметров
-    int N = ui->spinTest_N->value();
-    double u0_val = ui->spinTest_U0->value();
-    double x0 = ui->spinTest_X0->value();
-    double b = ui->spinTest_B->value();
-
-    // Формула: u' = A*u, A = (-1)^N * N/2
-    double A = std::pow(-1, N) * (double(N) / 2.0);
-
-    RK4Solver<double>::State u_start = { u0_val };
-    auto system = [A](double x, const Vector<double>& v) {
-        return Vector<double>{ A * v.data[0] };
-    };
-
-    auto exactFunc = [u0_val, A, x0](double x) {
-        return Vector<double>{ u0_val * std::exp(A * (x - x0)) };
-    };
-
-    RK4Solver<double>::Config config;
-    config.initial_h = ui->spinTest_H->value();
-    config.eps = ui->spinTest_Eps->value();
-    config.adaptive = ui->checkTest_Control->isChecked();
-    config.max_steps = ui->spinMaxIter->value();
-
-    // Запуск решеталя
-    RK4Solver<double>::solve(x0, b, u_start, system,
-                             [&](const RK4Solver<double>::StepInfo& info) {
-                                 // Сохраняем шаг
-                                 results.steps.append(info);
-
-                                 // Сохраняем точное значение
-                                 double exact = exactFunc(info.x).data[0];
-                                 results.exactValues.append(exact);
-
-                                 // Обновляем статистику
-                                 results.stats.n_steps++;
-                                 results.stats.total_c1 += info.c1;
-                                 results.stats.total_c2 += info.c2;
-                                 results.stats.end_x = info.x;
-
-                                 if (std::abs(info.olp) > results.stats.max_olp)
-                                     results.stats.max_olp = std::abs(info.olp);
-
-                                 if (info.h > results.stats.max_h) {
-                                     results.stats.max_h = info.h;
-                                     results.stats.x_at_max_h = info.x;
-                                 }
-                                 if (info.h < results.stats.min_h) {
-                                     results.stats.min_h = info.h;
-                                     results.stats.x_at_min_h = info.x;
-                                 }
-
-                                 double err = std::abs(info.v.data[0] - exact);
-                                 if (err > results.stats.max_global_err) {
-                                     results.stats.max_global_err = err;
-                                     results.stats.x_at_max_err = info.x;
-                                 }
-                             },
-                             config
-                             );
-
-    return results;
+    showStats(results, params.b, true);
 }
 
 void MainWindow::updateTestTable(const SimulationResults& results) {
@@ -206,63 +170,15 @@ void MainWindow::updateTestCharts(const SimulationResults& results) {
 }
 
 void MainWindow::on_btnSolveMain_clicked() {
-    SimulationResults results = runMainSimulation();
+    MainParams params = getMainParams();
+
+    SimulationResults results = TaskSolver::solveMain(params);
+
     updateMainTable(results);
     updateMainCharts(results);
-
-    double b = ui->spinMain_B->value();
-    showStats(results, b, false);
+    showStats(results, params.b, false);
 }
 
-MainWindow::SimulationResults MainWindow::runMainSimulation() {
-    SimulationResults results;
-
-    double m = ui->spinMain_M->value();
-    double c = ui->spinMain_C->value();
-    double k = ui->spinMain_K->value();
-    double k_star = ui->spinMain_KStar->value();
-
-    RK4Solver<double>::State u_start = { ui->spinMain_U0->value(), ui->spinMain_V0->value() };
-
-    // Система: u' = v
-    //          v' = (-c*v - k*u - k*u^3) / m
-    auto system = [m, c, k, k_star](double x, const Vector<double>& st) {
-        double u = st.data[0];
-        double v = st.data[1];
-        double dv = (-c * v - k * u - k_star * std::pow(u, 3)) / m;
-        return Vector<double>{v, dv};
-    };
-
-    RK4Solver<double>::Config config;
-    config.initial_h = ui->spinMain_H->value();
-    config.eps = ui->spinMain_Eps->value();
-    config.adaptive = ui->checkTest_Control->isChecked();
-    config.max_steps = ui->spinMaxIter->value();
-
-    RK4Solver<double>::solve(ui->spinMain_X0->value(), ui->spinMain_B->value(), u_start, system,
-                             [&](const RK4Solver<double>::StepInfo& info) {
-                                 results.steps.append(info);
-
-                                 // Статистика
-                                 results.stats.n_steps++;
-                                 results.stats.total_c1 += info.c1;
-                                 results.stats.total_c2 += info.c2;
-                                 results.stats.end_x = info.x;
-
-                                 if (std::abs(info.olp) > results.stats.max_olp)
-                                     results.stats.max_olp = std::abs(info.olp);
-
-                                 if (info.h > results.stats.max_h) {
-                                     results.stats.max_h = info.h; results.stats.x_at_max_h = info.x;
-                                 }
-                                 if (info.h < results.stats.min_h) {
-                                     results.stats.min_h = info.h; results.stats.x_at_min_h = info.x;
-                                 }
-                             },
-                             config
-                             );
-    return results;
-}
 
 void MainWindow::updateMainTable(const SimulationResults& results) {
     ui->tableMain->setUpdatesEnabled(false);

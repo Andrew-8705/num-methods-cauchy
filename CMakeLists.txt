@@ -22,7 +22,14 @@ add_executable(rk4
     src/interface/mainwindow.cpp
     include/interface/mainwindow.h
     src/interface/mainwindow.ui
+
+    include/SimulationData.h
+    include/TaskSolver.h
+    src/TaskSolver.cpp
     
+    include/math/Vector.hpp
+    include/math/RK4Solver.hpp
+
     3rdparty/qcustomplot/qcustomplot.cpp
     3rdparty/qcustomplot/qcustomplot.h
 )

@@ -21,6 +21,7 @@ add_executable(rk4
     
     src/interface/mainwindow.cpp
     include/interface/mainwindow.h
+    include/interface/ResultsModel.h
     src/interface/mainwindow.ui
 
     include/SimulationData.h

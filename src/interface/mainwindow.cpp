@@ -8,7 +8,8 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    setupTables();
+
+    setupTablesViews();
 
     QList<QCustomPlot*> plots = {ui->plotTest, ui->plotMainU, ui->plotMainV, ui->plotPhase};
     for(auto plot : plots) {
@@ -22,50 +23,23 @@ MainWindow::~MainWindow() {
     delete ui;
 }
 
-void MainWindow::setupTables() {
-    // Тестовая задача
-    QStringList headersTest = {
-        "i",
-        "xᵢ",
-        "vᵢ",
-        "v₂ᵢ",
-        "vᵢ - v₂ᵢ",
-        "OLP",
-        "hᵢ",
-        "C1",
-        "C2",
-        "uᵢ",
-        "|uᵢ - vᵢ|"
+void MainWindow::setupTablesViews() {
+    m_testModel = new ResultsModel(ResultsModel::TestTask, this);
+    m_mainModel = new ResultsModel(ResultsModel::MainTask, this);
+
+    ui->tableTest->setModel(m_testModel);
+    ui->tableMain->setModel(m_mainModel);
+
+    auto setupView = [](QTableView* view) {
+        view->horizontalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+        view->horizontalHeader()->setDefaultSectionSize(100);
+        view->verticalHeader()->setVisible(false);
+        view->setSelectionBehavior(QAbstractItemView::SelectRows);
+        view->setAlternatingRowColors(true);
     };
 
-    ui->tableTest->setColumnCount(headersTest.size());
-    ui->tableTest->setHorizontalHeaderLabels(headersTest);
-    ui->tableTest->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    ui->tableTest->verticalHeader()->setVisible(false);
-    ui->tableTest->setEditTriggers(QAbstractItemView::NoEditTriggers);
-
-    // Основная задача
-    QStringList headersMain = {
-        "i",
-        "xᵢ",
-        "vᵢ",
-        "v₂ᵢ",
-        "vᵢ - v₂ᵢ",
-        "OLP",
-        "hᵢ",
-        "C1",
-        "C2",
-    };
-    ui->tableMain->setColumnCount(headersMain.size());
-    ui->tableMain->setHorizontalHeaderLabels(headersMain);
-    ui->tableMain->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    ui->tableMain->verticalHeader()->setVisible(false);
-    ui->tableMain->setEditTriggers(QAbstractItemView::NoEditTriggers);
-}
-
-QTableWidgetItem* MainWindow::createCell(double val, int precision) {
-    // 'g' - научная нотация, 'f' - обычная нотация
-    return new QTableWidgetItem(QString::number(val, 'g', precision));
+    setupView(ui->tableTest);
+    setupView(ui->tableMain);
 }
 
 TestParams MainWindow::getTestParams() {
@@ -77,7 +51,7 @@ TestParams MainWindow::getTestParams() {
     p.h = ui->spinTest_H->value();
     p.eps = ui->spinTest_Eps->value();
     p.adaptive = ui->checkTest_Control->isChecked();
-    p.max_steps = ui->spinMaxIter->value();
+    p.max_steps = ui->spinMain_MaxIter->value();
     return p;
 }
 
@@ -94,47 +68,28 @@ MainParams MainWindow::getMainParams() {
     p.h = ui->spinMain_H->value();
     p.eps = ui->spinMain_Eps->value();
     p.adaptive = ui->checkMain_Control->isChecked();
-    p.max_steps = ui->spinMaxIter->value();
+    p.max_steps = ui->spinMain_MaxIter->value();
     return p;
 }
 
 void MainWindow::on_btnCalcTest_clicked() {
     TestParams params = getTestParams();
 
-    SimulationResults results = TaskSolver::solveTest(params);
+    m_testResults = TaskSolver::solveTest(params);
+    m_testModel->setResults(&m_testResults);
 
-    updateTestTable(results);
-    updateTestCharts(results);
-    showStats(results, params.b, true);
+    updateTestCharts(m_testResults);
+    showStats(m_testResults, params.b, true);
 }
 
-void MainWindow::updateTestTable(const SimulationResults& results) {
-    // Отключить отрисовку для скорости
-    ui->tableTest->setUpdatesEnabled(false);
-    ui->tableTest->setSortingEnabled(false);
+void MainWindow::on_btnSolveMain_clicked() {
+    MainParams params = getMainParams();
 
-    ui->tableTest->setRowCount(results.steps.size());
+    m_mainResults = TaskSolver::solveMain(params);
+    m_mainModel->setResults(&m_mainResults);
 
-    for (int i = 0; i < results.steps.size(); ++i) {
-        const auto& info = results.steps[i];
-        double exact = results.exactValues[i];
-        double err = std::abs(info.v.data[0] - exact);
-
-        ui->tableTest->setItem(i, 0, new QTableWidgetItem(QString::number(info.iter)));
-        ui->tableTest->setItem(i, 1, createCell(info.x));
-        ui->tableTest->setItem(i, 2, createCell(info.v.data[0]));
-        ui->tableTest->setItem(i, 3, createCell(info.v2.data[0]));
-        ui->tableTest->setItem(i, 4, createCell(info.v.data[0] - info.v2.data[0], 2));
-        ui->tableTest->setItem(i, 5, createCell(info.olp, 2));
-        ui->tableTest->setItem(i, 6, createCell(info.h));
-        ui->tableTest->setItem(i, 7, new QTableWidgetItem(QString::number(info.c1)));
-        ui->tableTest->setItem(i, 8, new QTableWidgetItem(QString::number(info.c2)));
-        ui->tableTest->setItem(i, 9, createCell(exact));
-        ui->tableTest->setItem(i, 10, createCell(err, 2));
-    }
-
-    // Включить отрисовку обратно
-    ui->tableTest->setUpdatesEnabled(true);
+    updateMainCharts(m_mainResults);
+    showStats(m_mainResults, params.b, false);
 }
 
 void MainWindow::updateTestCharts(const SimulationResults& results) {
@@ -167,38 +122,6 @@ void MainWindow::updateTestCharts(const SimulationResults& results) {
     ui->plotTest->legend->setVisible(true);
     ui->plotTest->rescaleAxes();
     ui->plotTest->replot();
-}
-
-void MainWindow::on_btnSolveMain_clicked() {
-    MainParams params = getMainParams();
-
-    SimulationResults results = TaskSolver::solveMain(params);
-
-    updateMainTable(results);
-    updateMainCharts(results);
-    showStats(results, params.b, false);
-}
-
-
-void MainWindow::updateMainTable(const SimulationResults& results) {
-    ui->tableMain->setUpdatesEnabled(false);
-    ui->tableMain->setSortingEnabled(false);
-    ui->tableMain->setRowCount(results.steps.size());
-
-    for (int i = 0; i < results.steps.size(); ++i) {
-        const auto& info = results.steps[i];
-
-        ui->tableMain->setItem(i, 0, new QTableWidgetItem(QString::number(info.iter)));
-        ui->tableMain->setItem(i, 1, createCell(info.x));
-        ui->tableMain->setItem(i, 2, createCell(info.v.data[0]));
-        ui->tableMain->setItem(i, 3, createCell(info.v2.data[0]));
-        ui->tableMain->setItem(i, 4, createCell(info.v.data[0] - info.v2.data[0], 2));
-        ui->tableMain->setItem(i, 5, createCell(info.olp, 2));
-        ui->tableMain->setItem(i, 6, createCell(info.h));
-        ui->tableMain->setItem(i, 7, new QTableWidgetItem(QString::number(info.c1)));
-        ui->tableMain->setItem(i, 8, new QTableWidgetItem(QString::number(info.c2)));
-    }
-    ui->tableMain->setUpdatesEnabled(true);
 }
 
 void MainWindow::updateMainCharts(const SimulationResults& results) {
@@ -255,25 +178,30 @@ void MainWindow::showStats(const SimulationResults& results, double target_b, bo
     };
 
     html += row("Итераций (n):", QString::number(s.n_steps));
-    html += row("Погрешность границы (b - x<sub>n</sub>):", QString::number(target_b - s.end_x, 'e', 2));
-    html += row("Макс. ОЛП:", QString::number(s.max_olp, 'e', 2));
+
+    html += row("Погрешность границы (b - x<sub>n</sub>):", QString::number(target_b - s.end_x, 'f', 10));
+
+    html += row("Макс. ОЛП:", QString::number(s.max_olp, 'f', 10));
+
     html += row("Делений шага:", QString::number(s.total_c1));
     html += row("Удвоений шага:", QString::number(s.total_c2));
 
     html += row("Макс. шаг (h):", QString("%1 (при x=%2)")
-                                      .arg(s.max_h, 0, 'g', 4).arg(s.x_at_max_h, 0, 'f', 2));
+                                      .arg(s.max_h, 0, 'f', 10)
+                                      .arg(s.x_at_max_h, 0, 'f', 10));
 
     html += row("Мин. шаг (h):", QString("%1 (при x=%2)")
-                                     .arg(s.min_h, 0, 'g', 4).arg(s.x_at_min_h, 0, 'f', 2));
+                                     .arg(s.min_h, 0, 'f', 10)
+                                     .arg(s.x_at_min_h, 0, 'f', 10));
 
     if (isTest) {
         html += row("Макс. глоб. ошибка:", QString("%1 (при x=%2)")
-                                               .arg(s.max_global_err, 0, 'e', 2).arg(s.x_at_max_err, 0, 'f', 2));
+                                               .arg(s.max_global_err, 0, 'g', 10)
+                                               .arg(s.x_at_max_err, 0, 'f', 10));
     }
 
     html += "</table>";
 
     QLabel* label = isTest ? ui->labelTest_Stats : ui->labelMain_Stats;
-    //QLabel* label = ui->labelTest_Stats;
     label->setText(html);
 }

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QTableView>
 #include "../math/RK4Solver.hpp"
 #include "qcustomplot.h"
-#include "SimulationData.h"
+#include "interface/ResultsModel.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -24,18 +25,18 @@ private slots:
 private:
     Ui::MainWindow *ui;
 
-    void setupTables();
+    SimulationResults m_testResults;
+    SimulationResults m_mainResults;
 
-    void updateTestTable(const SimulationResults& results);
-    void updateMainTable(const SimulationResults& results);
+    ResultsModel* m_testModel;
+    ResultsModel* m_mainModel;
 
-    void updateTestCharts(const SimulationResults& results);
-    void updateMainCharts(const SimulationResults& results);
-
-    void showStats(const SimulationResults& results, double target_b, bool isTest);
-
-    QTableWidgetItem* createCell(double val, int precision = 6);
+    void setupTablesViews();
 
     TestParams getTestParams();
     MainParams getMainParams();
+
+    void updateTestCharts(const SimulationResults& results);
+    void updateMainCharts(const SimulationResults& results);
+    void showStats(const SimulationResults& results, double target_b, bool isTest);
 };

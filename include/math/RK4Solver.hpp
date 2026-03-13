@@ -2,8 +2,6 @@
 
 #include "Vector.hpp"
 #include <functional>
-#include <iostream>
-#include <iomanip>
 
 template <typename T>
 class RK4Solver {
@@ -64,13 +62,6 @@ public:
         while (x < x_end - 1e-9 && iter < config.max_steps) {
             // Выход на правую границу
             if (x + h > x_end) h = x_end - x;
-
-            // State v_full = calc_step(x, u, h, f);
-            // State v_half_1 = calc_step(x, u, h * 0.5, f);
-            // State v_half_2 = calc_step(x + h * 0.5, v_half_1, h * 0.5, f); // v2i
-
-            // State diff = v_half_2 - v_full;
-            // T s_norm = diff.norm() / 15.0;
 
             int c1 = 0; // Счётчик деления
             int c2 = 0; // Счётчик удвоения
@@ -144,32 +135,4 @@ private:
 
         return v + (k1 + k2 * 2.0 + k3 * 2.0 + k4) * (h / 6.0);
     }
-
-    // static void print_header(bool has_exact) {
-    //     std::cout << std::fixed << std::setprecision(6);
-
-    //     std::cout << std::setw(10) << "x" << " | " 
-    //             << std::setw(10) << "h" << " | " 
-    //             << std::setw(12) << "RK4";
-        
-    //     if (has_exact) {
-    //         std::cout << " | " << std::setw(12) << "Exact" 
-    //                 << " | " << std::setw(12) << "Error";
-    //     }
-
-    //     std::cout << "\n" << std::string(has_exact ? 73 : 38, '-') << "\n";
-    // }
-
-    // static void print_line(T x, T h, const State& u, std::function<T(T)> exact) {
-    //     std::cout << std::setw(10) << x << " | " 
-    //             << std::setw(10) << h << " | " 
-    //             << std::setw(12) << u.data[0];
-                
-    //     if (exact) {
-    //         T val = exact(x);
-    //         std::cout << " | " << std::setw(12) << val 
-    //                 << " | " << std::setw(12) << std::abs(u.data[0] - val);
-    //     }
-    //     std::cout << "\n";
-    // }
 };
